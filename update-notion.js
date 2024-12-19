@@ -13,19 +13,18 @@ const { Client } = require('@notionhq/client');
     const itemName = record.Name || 'Unnamed Item';
     const quantity = parseFloat(record.Quantity) || 0;
 
-    // Query the database for an existing page with the same item name
+    // Double-check this property name matches the exact property in Notion
     const existingPages = await notion.databases.query({
       database_id: databaseId,
       filter: {
-        property: 'Name',       // Property name in Notion
+        property: 'Name', // Must match the exact property name
         title: {
-          equals: itemName      // Since it's a title property, use the "title" filter
+          equals: itemName
         }
       }
     });
 
     if (existingPages.results.length > 0) {
-      // If the item exists, update its Quantity
       const pageId = existingPages.results[0].id;
       await notion.pages.update({
         page_id: pageId,
@@ -37,7 +36,6 @@ const { Client } = require('@notionhq/client');
       });
       console.log(`Updated existing item: ${itemName}`);
     } else {
-      // If the item does not exist, create a new page
       await notion.pages.create({
         parent: { database_id: databaseId },
         properties: {
