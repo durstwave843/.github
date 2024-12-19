@@ -1,0 +1,32 @@
+name: Update AnyList and Notion
+
+on:
+  push:
+    paths:
+      - "update-anylist-and-notion.js"
+      - "scanned-items.csv"
+  workflow_dispatch:        # Allow manual triggering
+
+jobs:
+  update-anylist-and-notion:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install @notionhq/client@latest csv-parse@latest anylist@latest
+
+      - name: Update AnyList and Notion
+        env:
+          ANYLIST_EMAIL: ${{ secrets.ANYLIST_EMAIL }}
+          ANYLIST_PASSWORD: ${{ secrets.ANYLIST_PASSWORD }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: node update-anylist-and-notion.js
