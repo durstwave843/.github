@@ -2,14 +2,15 @@ const fs = require('fs');
 const { parse } = require('csv-parse/sync');
 const { Client } = require('@notionhq/client');
 
-const db = await notion.databases.retrieve({ database_id: databaseId });
-console.log(JSON.stringify(db, null, 2));
-
-
 (async () => {
   const notion = new Client({ auth: process.env.NOTION_TOKEN });
   const databaseId = process.env.NOTION_DATABASE_ID;
 
+  // First, verify the property name and type in the database
+  const db = await notion.databases.retrieve({ database_id: databaseId });
+  console.log('Database schema:', JSON.stringify(db, null, 2));
+
+  // Assuming the title property is indeed named "Name" and is of type "title"
   const csvContent = fs.readFileSync('scanned-items.csv', 'utf8');
   const records = parse(csvContent, { columns: true, skip_empty_lines: true });
 
@@ -17,11 +18,11 @@ console.log(JSON.stringify(db, null, 2));
     const itemName = record.Name || 'Unnamed Item';
     const quantity = parseFloat(record.Quantity) || 0;
 
-    // Double-check this property name matches the exact property in Notion
+    // Use the exact property name from the schema; make sure it's the title property
     const existingPages = await notion.databases.query({
       database_id: databaseId,
       filter: {
-        property: 'Name', // Must match the exact property name
+        property: 'Name', // EXACT name from the schema
         title: {
           equals: itemName
         }
