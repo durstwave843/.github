@@ -1,0 +1,4 @@
+console.log('About to retrieve the database schema...');
+const db = await notion.databases.retrieve({ database_id: databaseId });
+console.log('Database schema:', JSON.stringify(db, null, 2));
+process.exit(0);
