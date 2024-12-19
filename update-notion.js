@@ -2,6 +2,10 @@ const fs = require('fs');
 const { parse } = require('csv-parse/sync');
 const { Client } = require('@notionhq/client');
 
+const db = await notion.databases.retrieve({ database_id: databaseId });
+console.log(JSON.stringify(db, null, 2));
+
+
 (async () => {
   const notion = new Client({ auth: process.env.NOTION_TOKEN });
   const databaseId = process.env.NOTION_DATABASE_ID;
