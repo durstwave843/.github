@@ -29,17 +29,17 @@ const { Client } = require('@notionhq/client');
     const records = parse(csvContent, { columns: true, skip_empty_lines: true });
     console.log(`Parsed ${records.length} records from CSV.`);
 
-    for (const record of records) {
+    for (const [index, record] of records.entries()) {
       const itemNameRaw = record.Name;
       const itemName = itemNameRaw ? itemNameRaw.trim() : 'Unnamed Item';
       const quantityRaw = record.Quantity;
       const quantity = parseFloat(quantityRaw) || 0;
 
-      console.log(`\nProcessing item: "${itemName}", Quantity: ${quantity}`);
+      console.log(`\nRecord ${index + 1}: Processing item: "${itemName}", Quantity: ${quantity}`);
 
       // Validate itemName
       if (typeof itemName !== 'string' || itemName.length === 0) {
-        console.warn(`Skipping item due to invalid name: "${itemName}"`);
+        console.warn(`Skipping record ${index + 1} due to invalid name: "${itemName}"`);
         continue;
       }
 
