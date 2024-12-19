@@ -5,28 +5,45 @@ const { Client } = require('@notionhq/client');
 (async () => {
   try {
     // Initialize Notion client
-    if (!process.env.NOTION_TOKEN) {
+    const notionToken = process.env.NOTION_TOKEN;
+    const databaseId = process.env.NOTION_DATABASE_ID;
+
+    if (!notionToken) {
       throw new Error('NOTION_TOKEN is not defined.');
     }
-    if (!process.env.NOTION_DATABASE_ID) {
+    if (!databaseId) {
       throw new Error('NOTION_DATABASE_ID is not defined.');
     }
 
-    const notion = new Client({ auth: process.env.NOTION_TOKEN });
-    const databaseId = process.env.NOTION_DATABASE_ID;
+    const notion = new Client({ auth: notionToken });
+    console.log('Initialized Notion client.');
+    console.log(`Using database ID: ${databaseId}`);
 
     // Read and parse CSV
-    const csvContent = fs.readFileSync('scanned-items.csv', 'utf8');
+    const csvPath = 'scanned-items.csv';
+    if (!fs.existsSync(csvPath)) {
+      throw new Error(`CSV file "${csvPath}" does not exist.`);
+    }
+
+    const csvContent = fs.readFileSync(csvPath, 'utf8');
     const records = parse(csvContent, { columns: true, skip_empty_lines: true });
     console.log(`Parsed ${records.length} records from CSV.`);
 
     for (const record of records) {
-      const itemName = record.Name ? record.Name.trim() : 'Unnamed Item';
-      const quantity = parseFloat(record.Quantity) || 0;
+      const itemNameRaw = record.Name;
+      const itemName = itemNameRaw ? itemNameRaw.trim() : 'Unnamed Item';
+      const quantityRaw = record.Quantity;
+      const quantity = parseFloat(quantityRaw) || 0;
 
-      console.log(`Processing item: ${itemName}, Quantity: ${quantity}`);
+      console.log(`\nProcessing item: "${itemName}", Quantity: ${quantity}`);
 
-      // Build the filter object
+      // Validate itemName
+      if (typeof itemName !== 'string' || itemName.length === 0) {
+        console.warn(`Skipping item due to invalid name: "${itemName}"`);
+        continue;
+      }
+
+      // Construct the filter object
       const filter = {
         property: 'Name', // Must match exactly the property name from schema
         title: {
@@ -34,46 +51,66 @@ const { Client } = require('@notionhq/client');
         }
       };
 
-      console.log('Filter object:', JSON.stringify(filter, null, 2));
+      console.log('Constructed filter:', JSON.stringify(filter, null, 2));
 
-      // Query the database for an existing page with the same item name
-      const existingPages = await notion.databases.query({
-        database_id: databaseId,
-        filter: filter
-      });
+      // Query the database for existing pages with the same name
+      let existingPages;
+      try {
+        existingPages = await notion.databases.query({
+          database_id: databaseId,
+          filter: filter
+        });
+      } catch (queryError) {
+        console.error(`Error querying database for item "${itemName}":`, queryError.message);
+        throw queryError;
+      }
 
-      console.log(`Found ${existingPages.results.length} existing pages for item: ${itemName}`);
+      console.log(`Found ${existingPages.results.length} existing page(s) for item: "${itemName}"`);
 
       if (existingPages.results.length > 0) {
-        // If the item exists, update its Quantity
+        // Update the first matching page's Quantity
         const pageId = existingPages.results[0].id;
-        await notion.pages.update({
-          page_id: pageId,
-          properties: {
-            Quantity: {
-              number: quantity
+        console.log(`Updating page ID: ${pageId}`);
+
+        try {
+          await notion.pages.update({
+            page_id: pageId,
+            properties: {
+              Quantity: {
+                number: quantity
+              }
             }
-          }
-        });
-        console.log(`Updated existing item: ${itemName}`);
+          });
+          console.log(`Updated Quantity for item: "${itemName}"`);
+        } catch (updateError) {
+          console.error(`Error updating page ID "${pageId}":`, updateError.message);
+          throw updateError;
+        }
       } else {
-        // If the item does not exist, create a new page
-        await notion.pages.create({
-          parent: { database_id: databaseId },
-          properties: {
-            Name: {
-              title: [{ text: { content: itemName } }]
-            },
-            Quantity: {
-              number: quantity
+        // Create a new page for the item
+        console.log(`Creating new page for item: "${itemName}"`);
+
+        try {
+          await notion.pages.create({
+            parent: { database_id: databaseId },
+            properties: {
+              Name: {
+                title: [{ text: { content: itemName } }]
+              },
+              Quantity: {
+                number: quantity
+              }
             }
-          }
-        });
-        console.log(`Created new item: ${itemName}`);
+          });
+          console.log(`Created new item: "${itemName}"`);
+        } catch (createError) {
+          console.error(`Error creating page for item "${itemName}":`, createError.message);
+          throw createError;
+        }
       }
     }
 
-    console.log('Notion database updated without duplicating entries!');
+    console.log('\nNotion database updated without duplicating entries!');
   } catch (error) {
     console.error('Error:', error.message);
     console.error(error);
