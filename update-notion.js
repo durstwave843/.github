@@ -9,31 +9,55 @@ const { Client } = require('@notionhq/client');
   // Read and parse CSV
   const csvContent = fs.readFileSync('scanned-items.csv', 'utf8');
   const records = parse(csvContent, { columns: true, skip_empty_lines: true });
-  // records will be an array of objects like: [{ Name: 'Bananas', Quantity: '5' }, { Name: 'Apples', Quantity: '10' }, ...]
 
-  // Insert each row into the Notion database
   for (const record of records) {
-    // Convert Quantity to a number if needed
+    const itemName = record.Name || 'Unnamed Item';
     const quantity = parseFloat(record.Quantity) || 0;
 
-    await notion.pages.create({
-      parent: { database_id: databaseId },
-      properties: {
-        Name: {
-          title: [
-            {
-              text: {
-                content: record.Name || 'Unnamed Item'
-              }
-            }
-          ]
-        },
-        Quantity: {
-          number: quantity
+    // 1. Check if an item with the same name already exists in the database
+    const existingPages = await notion.databases.query({
+      database_id: databaseId,
+      filter: {
+        property: 'Name',
+        text: {
+          equals: itemName
         }
       }
     });
+
+    if (existingPages.results.length > 0) {
+      // 2. If it exists, update the existing page
+      const pageId = existingPages.results[0].id;
+      await notion.pages.update({
+        page_id: pageId,
+        properties: {
+          Quantity: {
+            number: quantity
+          }
+        }
+      });
+      console.log(`Updated existing item: ${itemName}`);
+    } else {
+      // 3. If not found, create a new page
+      await notion.pages.create({
+        parent: { database_id: databaseId },
+        properties: {
+          Name: {
+            title: [
+              {
+                text: { content: itemName }
+              }
+            ]
+          },
+          Quantity: {
+            number: quantity
+          }
+        }
+      });
+      console.log(`Created new item: ${itemName}`);
+    }
   }
 
-  console.log('Notion database updated with CSV contents!');
+  console.log('Notion database updated without duplicating entries!');
 })();
+
