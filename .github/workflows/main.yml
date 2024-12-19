@@ -1,71 +1,51 @@
-const fs = require('fs');
-const { parse } = require('csv-parse/sync');
-const { Client } = require('@notionhq/client');
+name: Update Notion from CSV
 
-(async () => {
-  try {
-    const notion = new Client({ auth: process.env.NOTION_TOKEN });
-    const databaseId = process.env.NOTION_DATABASE_ID;
+on:
+  push:
+    paths:
+      - "scanned-items.csv"  # Trigger when this file changes
+  workflow_dispatch:        # Allow manual triggering
 
-    // Retrieve and print the database schema
-    console.log('Fetching database schema...');
-    const db = await notion.databases.retrieve({ database_id: databaseId });
-    console.log('Database schema:', JSON.stringify(db, null, 2));
+jobs:
+  retrieve-schema:
+    runs-on: ubuntu-latest
 
-    // Exit after printing the schema to debug
-    process.exit(0);
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
 
-    // Existing code is commented out for debugging
-    /*
-    const csvContent = fs.readFileSync('scanned-items.csv', 'utf8');
-    const records = parse(csvContent, { columns: true, skip_empty_lines: true });
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
 
-    for (const record of records) {
-      const itemName = record.Name || 'Unnamed Item';
-      const quantity = parseFloat(record.Quantity) || 0;
+      - name: Install dependencies
+        run: npm install @notionhq/client csv-parse
 
-      // Query the database for an existing page with the same item name
-      const existingPages = await notion.databases.query({
-        database_id: databaseId,
-        filter: {
-          property: 'Name', // Must match the exact property name from schema
-          title: {
-            equals: itemName
-          }
-        }
-      });
+      - name: Retrieve Notion database schema
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: node retrieve-schema.js
 
-      if (existingPages.results.length > 0) {
-        const pageId = existingPages.results[0].id;
-        await notion.pages.update({
-          page_id: pageId,
-          properties: {
-            Quantity: {
-              number: quantity
-            }
-          }
-        });
-        console.log(`Updated existing item: ${itemName}`);
-      } else {
-        await notion.pages.create({
-          parent: { database_id: databaseId },
-          properties: {
-            Name: {
-              title: [{ text: { content: itemName } }]
-            },
-            Quantity: {
-              number: quantity
-            }
-          }
-        });
-        console.log(`Created new item: ${itemName}`);
-      }
-    }
+  update-notion:
+    needs: retrieve-schema
+    runs-on: ubuntu-latest
 
-    console.log('Notion database updated without duplicating entries!');
-    */
-  } catch (error) {
-    console.error(error);
-    process.exit(1);
-  }
-})();
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install @notionhq/client csv-parse
+
+      - name: Update Notion database
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: node update-notion.js
