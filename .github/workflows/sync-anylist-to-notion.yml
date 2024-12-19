@@ -1,0 +1,29 @@
+name: Sync AnyList to Notion
+
+on:
+  repository_dispatch:
+    types: [anylist-update]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install @notionhq/client csv-parse anylist dotenv
+
+      - name: Run Synchronization Script
+        env:
+          ANYLIST_EMAIL: ${{ secrets.ANYLIST_EMAIL }}
+          ANYLIST_PASSWORD: ${{ secrets.ANYLIST_PASSWORD }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: node update-anylist-and-notion.js
